@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRYCODE Admin | Chat Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #f8fafc;
+            --accent: #40E0D0;
+            --primary: #6366f1;
+            --card: #ffffff;
+            --text: #0f172a;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+        #chatView {
+            background-color: #f1f5f9;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .chat-bubble-me {
+            background: var(--accent);
+            color: white;
+            border-radius: 18px 18px 2px 18px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.15);
+        }
+
+        .chat-bubble-them {
+            background: #ffffff;
+            color: #1e293b;
+            border-radius: 18px 18px 18px 2px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f1f5f9;
+        }
+
+        .thread-card {
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .thread-card.active {
+            background: white;
+            border-color: var(--accent);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        }
+
+        .thread-card:hover:not(.active) {
+            background: rgba(255,255,255,0.5);
+            transform: translateX(5px);
+        }
+
+        .tab-btn.active {
+            background: #eef2ff;
+            color: #4f46e5;
+        }
+
+        .admin-section {
+            display: none;
+            height: 100%;
+        }
+
+        .admin-section.active {
+            display: flex;
+        }
+
+        .list-card {
+            background: white;
+            padding: 24px;
+            border-radius: 32px;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .list-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-color: #eef2ff;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            background: #fef2f2;
+            color: #ef4444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+
+        .list-card:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+<body class="flex h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-80 bg-slate-50 border-r border-slate-200 flex flex-col p-6 z-50 h-full">
+        <div class="flex items-center gap-3 mb-8">
+            <img src="logo.JPEG" class="w-10 h-10 rounded-full object-cover shadow-lg border border-indigo-200" alt="Logo">
+            <div>
+                <h1 class="text-xl tracking-[0.1em] uppercase flex items-center gap-1">
+                    <span class="font-black text-[#40E0D0]">KRY</span><span class="font-medium text-[#40E0D0]">CODE</span> <span class="font-black">Admin</span>
+                </h1>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chat Center</p>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scroll">
+            <h3 class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 px-2">Management</h3>
+            <div class="space-y-1 mb-6">
+                <button onclick="switchTab('chat')" id="tabBtn-chat" class="tab-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all active">
+                    <i class="fa-solid fa-comments text-lg"></i> Live Chat
+                </button>
+                <button onclick="switchTab('portfolio')" id="tabBtn-portfolio" class="tab-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                    <i class="fa-solid fa-briefcase text-lg"></i> Portfolio
+                </button>
+                <button onclick="switchTab('blog')" id="tabBtn-blog" class="tab-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                    <i class="fa-solid fa-newspaper text-lg"></i> Blog
+                </button>
+                <button onclick="switchTab('promos')" id="tabBtn-promos" class="tab-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                    <i class="fa-solid fa-tag text-lg"></i> Promos
+                </button>
+                <button onclick="switchTab('notifications')" id="tabBtn-notifications" class="tab-btn w-full flex items-center gap-4 px-4 py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+                    <i class="fa-solid fa-bell text-lg"></i> Notifications
+                </button>
+            </div>
+
+            <h3 class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 px-2">Active Conversations</h3>
+            <div id="threadList" class="space-y-2">
+                <!-- Threads populated here -->
+            </div>
+        </div>
+
+        <div class="mt-6 pt-6 border-t border-slate-200">
+            <a href="index.htm" class="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg">
+                <i class="fa-solid fa-arrow-left"></i> Back to Site
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative bg-white overflow-hidden">
+        
+        <!-- Live Chat Section -->
+        <section id="section-chat" class="admin-section active flex-col">
+            <header class="h-20 px-8 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur z-10">
+                <div class="flex items-center gap-4">
+                    <div id="statusIndicator" class="w-3 h-3 bg-slate-300 rounded-full"></div>
+                    <div>
+                        <h2 id="currentThreadName" class="font-black text-lg tracking-tight">Select a conversation</h2>
+                        <p id="currentSessionId" class="text-[9px] text-slate-400 font-mono uppercase"></p>
+                    </div>
+                </div>
+                <div id="adminProfile" class="flex items-center gap-3">
+                    <div class="text-right">
+                        <p id="adminName" class="text-sm font-black">Admin Access</p>
+                        <p class="text-[10px] text-green-500 font-bold uppercase">System Online</p>
+                    </div>
+                    <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">A</div>
+                </div>
+            </header>
+
+            <div id="chatView" class="flex-1 p-8 space-y-6 overflow-y-auto custom-scroll flex flex-col">
+                <div class="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+                    <i class="fa-solid fa-comments text-6xl opacity-10"></i>
+                    <p class="font-bold text-sm">Select a user from the sidebar to start chatting</p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-white border-t border-slate-100 flex items-center gap-4">
+                <button class="w-10 h-10 rounded-xl hover:bg-slate-50 text-slate-400 flex items-center justify-center transition-all"><i class="fa-regular fa-face-smile text-lg"></i></button>
+                <div class="flex-1 relative">
+                    <input id="replyInput" type="text" placeholder="Type your response..." class="w-full bg-slate-50 border border-slate-100 rounded-xl px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-slate-400 font-medium">
+                </div>
+                <button id="sendBtn" class="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
+                    <i id="sendBtnIcon" class="fa-solid fa-microphone text-lg"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Portfolio Section -->
+        <section id="section-portfolio" class="admin-section flex-col p-8 overflow-y-auto custom-scroll">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-2xl font-black">Portfolio Management</h2>
+                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Our Works</p>
+                </div>
+                <button onclick="openModal('portfolio')" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-plus mr-2"></i> Add Project
+                </button>
+            </div>
+            <div id="portfolioList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Portfolio items populated here -->
+            </div>
+        </section>
+
+        <!-- Blog Section -->
+        <section id="section-blog" class="admin-section flex-col p-8 overflow-y-auto custom-scroll">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-2xl font-black">Blog Management</h2>
+                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Engineering & News</p>
+                </div>
+                <button onclick="openModal('blog')" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-plus mr-2"></i> Create Article
+                </button>
+            </div>
+            <div id="blogList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Blog items populated here -->
+            </div>
+        </section>
+
+        <!-- Promos Section -->
+        <section id="section-promos" class="admin-section flex-col p-8 overflow-y-auto custom-scroll">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-2xl font-black">Promo Management</h2>
+                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">Special Offers</p>
+                </div>
+                <button onclick="openModal('promos')" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-plus mr-2"></i> New Offer
+                </button>
+            </div>
+            <div id="promoList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Promo items populated here -->
+            </div>
+        </section>
+
+        <!-- Notifications Section -->
+        <section id="section-notifications" class="admin-section flex-col p-8 overflow-y-auto custom-scroll">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h2 class="text-2xl font-black">Notification Management</h2>
+                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-1">System Alerts</p>
+                </div>
+                <button onclick="openModal('notifications')" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-plus mr-2"></i> Post Alert
+                </button>
+            </div>
+            <div id="notificationList" class="space-y-4">
+                <!-- Notification items populated here -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-xl rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div class="p-8 border-b border-slate-100 flex items-center justify-between">
+                <h3 id="modalTitle" class="text-xl font-black">Add New Item</h3>
+                <button onclick="closeModal()" class="w-10 h-10 rounded-full hover:bg-slate-50 text-slate-400 flex items-center justify-center transition-all"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-8">
+                <form id="adminForm" class="space-y-6">
+                    <!-- Form fields will be dynamically added -->
+                    <div id="formFields" class="space-y-4"></div>
+                    <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                        Publish Now
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { firebaseConfig } from './firebase-config.js';
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let activeSession = null;
+        let chatListener = null;
+        const threads = new Map(); // userId -> chatData
+        const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+
+        // UI Elements
+        const threadList = document.getElementById('threadList');
+        const chatView = document.getElementById('chatView');
+        const replyInput = document.getElementById('replyInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const sendBtnIcon = document.getElementById('sendBtnIcon');
+        const currentThreadName = document.getElementById('currentThreadName');
+        const currentSessionId = document.getElementById('currentSessionId');
+        const statusIndicator = document.getElementById('statusIndicator');
+
+        // Tab Management
+        let currentTab = 'chat';
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(`section-${tabId}`).classList.add('active');
+            document.getElementById(`tabBtn-${tabId}`).classList.add('active');
+            
+            currentTab = tabId;
+            if (tabId !== 'chat') loadData(tabId);
+        };
+
+        // Modal Management
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const formFields = document.getElementById('formFields');
+        const adminForm = document.getElementById('adminForm');
+        let currentModalType = '';
+
+        window.openModal = function(type) {
+            currentModalType = type;
+            modalOverlay.classList.remove('hidden');
+            modalTitle.textContent = `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            
+            let html = '';
+            if (type === 'portfolio') {
+                html = `
+                    <input type="text" name="title" placeholder="Project Title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <textarea name="description" placeholder="Short Description" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none h-32" required></textarea>
+                    <input type="url" name="image" placeholder="Image URL" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <input type="url" name="url" placeholder="Project Link" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                `;
+            } else if (type === 'blog') {
+                html = `
+                    <input type="text" name="title" placeholder="Article Title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <input type="text" name="category" placeholder="Category (e.g. Engineering)" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <textarea name="blurb" placeholder="Excerpt / Blurb" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none h-32" required></textarea>
+                    <input type="url" name="image" placeholder="Cover Image URL" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                `;
+            } else if (type === 'promos') {
+                html = `
+                    <input type="text" name="title" placeholder="Promo Title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <input type="text" name="tag" placeholder="Tag (e.g. Limited Time)" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <input type="number" name="price" placeholder="Price (e.g. 2500)" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <textarea name="blurb" placeholder="Offer Details" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none h-32" required></textarea>
+                `;
+            } else if (type === 'notifications') {
+                html = `
+                    <input type="text" name="title" placeholder="Notification Title" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <input type="text" name="icon" placeholder="FontAwesome Icon (e.g. fa-rocket)" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none" required>
+                    <textarea name="description" placeholder="Detailed Message" class="w-full p-4 bg-slate-50 rounded-xl border-none outline-none h-32" required></textarea>
+                `;
+            }
+            formFields.innerHTML = html;
+        };
+
+        window.closeModal = function() {
+            modalOverlay.classList.add('hidden');
+            adminForm.reset();
+        };
+
+        // Data Management
+        async function loadData(type) {
+            const listId = `${type}List`;
+            const listEl = document.getElementById(listId);
+            if (!listEl) return;
+
+            const collection = type === 'portfolio' ? 'portfolios' : type;
+            const snapshot = await db.collection(collection).orderBy('timestamp', 'desc').get();
+            
+            listEl.innerHTML = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return `
+                    <div class="list-card group">
+                        <button onclick="deleteItem('${collection}', '${doc.id}')" class="delete-btn">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                        <div class="flex items-start gap-4 mb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                                <i class="fa-solid ${data.icon || (type === 'portfolio' ? 'fa-briefcase' : type === 'blog' ? 'fa-newspaper' : type === 'promos' ? 'fa-tag' : 'fa-bell')} text-lg"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <h4 class="font-black text-slate-900 truncate pr-8">${data.title}</h4>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">${data.category || data.tag || 'Global'}</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-slate-500 line-clamp-3 leading-relaxed">${data.description || data.blurb || ''}</p>
+                        ${data.price ? `<div class="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                            <span class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Starting at</span>
+                            <span class="text-lg font-black text-indigo-600">$${data.price}</span>
+                        </div>` : ''}
+                    </div>
+                `;
+            }).join('') || `<div class="col-span-full flex flex-col items-center justify-center py-20 text-slate-300">
+                <i class="fa-solid fa-folder-open text-6xl opacity-10 mb-4"></i>
+                <p class="font-bold italic text-sm">No ${type} items have been published yet.</p>
+            </div>`;
+        }
+
+        window.deleteItem = async function(collection, id) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                await db.collection(collection).doc(id).delete();
+                loadData(currentTab);
+            }
+        };
+
+        adminForm.onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(adminForm);
+            const data = Object.fromEntries(formData.entries());
+            data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+            const collection = currentModalType === 'portfolio' ? 'portfolios' : currentModalType;
+            
+            try {
+                await db.collection(collection).add(data);
+                closeModal();
+                loadData(currentTab);
+            } catch (err) {
+                alert("Failed to publish: " + err.message);
+            }
+        };
+
+        // Initialize Database Helper (Ensures collections exist)
+        window.initCollections = async function() {
+            try {
+                const user = auth.currentUser;
+                if (!user) throw new Error("Must be logged in as admin to initialize.");
+
+                // Ensure current admin user has a document
+                await db.collection('users').doc(user.uid).set({
+                    name: user.displayName || 'Admin',
+                    email: user.email,
+                    role: 'admin',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                alert("Database collections initialized successfully!");
+                location.reload();
+            } catch (err) {
+                console.error(err);
+                alert("Initialization failed: " + err.message);
+            }
+        };
+
+        // Check Auth
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('adminName').textContent = user.displayName || user.email.split('@')[0];
+            } else {
+                window.location.href = 'index.htm';
+            }
+        });
+
+        // Listen for all chat metadata
+        db.collection('chats').orderBy('lastTimestamp', 'desc').onSnapshot((snapshot) => {
+            let hasNewIncoming = false;
+            
+            snapshot.docChanges().forEach(change => {
+                const chat = change.doc.data();
+                const sid = change.doc.id;
+
+                if (change.type === 'added' || change.type === 'modified') {
+                    threads.set(sid, chat);
+                    if (change.type === 'added' && !snapshot.metadata.hasPendingWrites) {
+                        hasNewIncoming = true;
+                    }
+                } else if (change.type === 'removed') {
+                    threads.delete(sid);
+                }
+            });
+
+            if (hasNewIncoming) {
+                notifySound.play().catch(() => {});
+            }
+
+            renderThreads();
+        });
+
+        function renderThreads() {
+            if (!threadList) return;
+
+            const sortedThreads = Array.from(threads.entries()).sort((a, b) => {
+                const tA = a[1].lastTimestamp?.toDate()?.getTime() || 0;
+                const tB = b[1].lastTimestamp?.toDate()?.getTime() || 0;
+                return tB - tA;
+            });
+
+            threadList.innerHTML = sortedThreads.map(([sid, chat]) => `
+                <div onclick="selectThread('${sid}')" class="thread-card p-4 rounded-2xl flex items-center gap-4 cursor-pointer border-b border-slate-100 ${sid === activeSession ? 'active' : ''}">
+                    <div class="relative shrink-0">
+                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-lg border border-indigo-100 uppercase">
+                            ${(chat.userName || 'G').charAt(0)}
+                        </div>
+                        <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-900 truncate">${chat.userName || 'Session ' + sid.slice(0, 4)}</span>
+                            <span class="text-[9px] text-slate-400 font-bold">${chat.lastTimestamp ? chat.lastTimestamp.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Just now'}</span>
+                        </div>
+                        <p class="text-xs text-slate-500 truncate">${chat.lastMessage || 'No messages'}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.selectThread = function(sid) {
+            activeSession = sid;
+            const chat = threads.get(sid) || { userName: 'Session ' + sid.slice(0, 8) };
+            currentThreadName.textContent = chat.userName;
+            currentSessionId.textContent = 'ID: ' + sid;
+            statusIndicator.classList.remove('bg-slate-300');
+            statusIndicator.classList.add('bg-green-500');
+            
+            renderThreads();
+            loadChatMessages(sid);
+            replyInput.focus();
+        }
+
+        function loadChatMessages(sid) {
+            if (chatListener) chatListener(); // Unsubscribe from previous
+
+            chatListener = db.collection('chats').doc(sid).collection('messages')
+                .orderBy('timestamp', 'asc')
+                .onSnapshot(snapshot => {
+                    const msgs = snapshot.docs.map(doc => doc.data());
+                    renderChat(msgs);
+                });
+        }
+
+        function renderChat(msgs) {
+            if (!chatView) return;
+            
+            chatView.innerHTML = msgs.map(m => {
+                const isMe = m.sender === 'admin';
+                return `
+                    <div class="flex ${isMe ? 'justify-end' : 'justify-start'} mb-4 px-2">
+                        <div class="${isMe ? 'chat-bubble-me' : 'chat-bubble-them'} p-3 px-4 max-w-[80%] shadow-sm">
+                            <div class="text-[14px] leading-relaxed break-words whitespace-pre-wrap">${m.text}</div>
+                            <div class="flex items-center justify-end gap-1 mt-1 opacity-60">
+                                <span class="text-[9px] uppercase font-bold">${m.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'Syncing...'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            chatView.scrollTop = chatView.scrollHeight;
+        }
+
+        replyInput.addEventListener('input', () => {
+            if (replyInput.value.trim().length > 0) {
+                sendBtnIcon.className = 'fa-solid fa-paper-plane text-lg';
+            } else {
+                sendBtnIcon.className = 'fa-solid fa-microphone text-lg';
+            }
+        });
+
+        sendBtn.onclick = () => {
+            const text = replyInput.value.trim();
+            if (!text || !activeSession) return;
+            
+            const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+            const data = {
+                text: text,
+                sender: 'admin',
+                timestamp: timestamp
+            };
+
+            const batch = db.batch();
+            const chatRef = db.collection('chats').doc(activeSession);
+            const msgRef = chatRef.collection('messages').doc();
+
+            batch.set(chatRef, {
+                lastMessage: text,
+                lastTimestamp: timestamp
+            }, { merge: true });
+
+            batch.set(msgRef, data);
+
+            batch.commit().then(() => {
+                replyInput.value = '';
+                replyInput.dispatchEvent(new Event('input'));
+                replyInput.focus();
+            }).catch(err => console.error("Error sending admin message:", err));
+        };
+
+        replyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendBtn.click();
+        });
+    </script>
+</body>
+</html>
